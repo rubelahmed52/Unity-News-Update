@@ -16,8 +16,42 @@ function Home(){const [news,setNews]=useState<News[]>(demo);useEffect(()=>{(asyn
 
 function Ad(){return <div className="ad">বিজ্ঞাপনের স্থান — এখানে আপনার Adsterra Banner Code বসবে</div>}
 
-function Article(){const {slug}=useParams();const [n,setN]=useState<News|null>(null);useEffect(()=>{(async()=>{if(supabase){const {data}=await supabase.from('news').select('*').eq('slug',slug).single();if(data)setN(data)}})()},[slug]);if(!n)n=demo.find(x=>x.slug===slug)||null;if(!n)return <Layout><main><h2>সংবাদ পাওয়া যায়নি</h2></main></Layout>;return <Layout><main className="article"><span className="tag">{n.category}</span><h1>{n.title}</h1><small>লেখক: {n.author||'ইউনিটি নিউজ'} · {new Date(n.published_at).toLocaleString('bn-BD')}</small><img className="article-img" src={n.image_url}/><Ad/><div className="content">{n.content}</div><Ad/></main></Layout>}
+function Article(){
+  const {slug}=useParams();
+  const [n,setN]=useState<News|null>(null);
 
+  useEffect(()=>{
+    (async()=>{
+      if(!supabase)return;
+      const {data}=await supabase
+        .from('news')
+        .select('*')
+        .eq('slug',slug)
+        .single();
+
+      if(data)setN(data);
+    })();
+  },[slug]);
+
+  const article=n||demo.find(x=>x.slug===slug)||null;
+
+  if(!article)
+    return <Layout><main><h2>সংবাদ পাওয়া যায়নি</h2></main></Layout>;
+
+  return <Layout>
+    <main className="article">
+      <span className="tag">{article.category}</span>
+      <h1>{article.title}</h1>
+      <small>
+        লেখক: {article.author||'ইউনিটি নিউজ'} · {new Date(article.published_at).toLocaleString('bn-BD')}
+      </small>
+      <img className="article-img" src={article.image_url}/>
+      <Ad/>
+      <div className="content">{article.content}</div>
+      <Ad/>
+    </main>
+  </Layout>;
+      }
 function SearchPage(){const [q,setQ]=useState('');const [res,setRes]=useState<News[]>([]);async function go(){if(supabase){const {data}=await supabase.from('news').select('*').eq('is_published',true).ilike('title',`%${q}%`);setRes(data||[])}else setRes(demo.filter(x=>x.title.includes(q)))}return <Layout><main><h1>সংবাদ খুঁজুন</h1><div className="search"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="সংবাদের শিরোনাম লিখুন..."/><button onClick={go}>খুঁজুন</button></div><section className="grid">{res.map(n=><Card key={n.id} n={n}/>)}</section></main></Layout>}
 
 function Admin(){const nav=useNavigate();const [session,setSession]=useState<any>(null);const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [title,setTitle]=useState('');const [content,setContent]=useState('');const [saving,setSaving]=useState(false);const [items,setItems]=useState<News[]>([]);useEffect(()=>{if(!supabase)return;supabase.auth.getSession().then(({data})=>setSession(data.session));supabase.auth.onAuthStateChange((_e,s)=>setSession(s));},[]);async function login(){if(!supabase)return alert('প্রথমে Supabase সংযোগ করুন।');const {error}=await supabase.auth.signInWithPassword({email,password});if(error)alert(error.message)}async function save(){if(!supabase||!session)return;setSaving(true);const slug=title.toLowerCase().replace(/[^a-z0-9\\s-]/g,'').trim().replace(/\\s+/g,'-')||`news-${Date.now()}`;const {error}=await supabase.from('news').insert({title,slug,content,excerpt:content.slice(0,150),category:'সর্বশেষ',author:session.user.email,is_published:true});setSaving(false);if(error)alert(error.message);else{setTitle('');setContent('');alert('সংবাদ প্রকাশ হয়েছে')}}if(!supabase||!session)return <Layout><main className="admin"><h1>Admin Login</h1><input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)}/><input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)}/><button className="btn" onClick={login}><LogIn/> Login</button><p className="hint">Supabase Auth চালু করে Admin user তৈরি করুন।</p></main></Layout>;return <Layout><main className="admin"><h1>Admin Dashboard</h1><input placeholder="সংবাদের শিরোনাম" value={title} onChange={e=>setTitle(e.target.value)}/><textarea placeholder="সংবাদের বিস্তারিত..." value={content} onChange={e=>setContent(e.target.value)}/><button className="btn" disabled={saving} onClick={save}><Plus/> {saving?'প্রকাশ হচ্ছে...':'সংবাদ প্রকাশ করুন'}</button><button onClick={async()=>{await supabase.auth.signOut();nav('/admin')}}>Logout</button></main></Layout>}
